@@ -114,6 +114,31 @@ tr:last-child td { border-bottom: none; }
 
 .hidden { display: none; }
 
+.overlay {
+  display: none; position: fixed; inset: 0; z-index: 999;
+  background: rgba(0,0,0,.6);
+}
+.overlay.show { display: block; }
+.modal {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 1000; width: min(680px,calc(100vw - 32px)); max-height: 80vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; font-size: 13px; line-height: 1.8;
+  display: none;
+}
+.modal.show { display: block; }
+.modal h3 { font-size: 15px; margin-bottom: 8px; }
+.modal code {
+  display: block; padding: 8px 12px; background: var(--bg); border-radius: 4px;
+  margin: 4px 0 12px; white-space: pre-wrap;
+}
+.modal .close-btn {
+  float: right; background: none; border: none; color: var(--text-dim);
+  font-size: 20px; cursor: pointer; padding: 0 4px;
+}
+.modal .close-btn:hover { color: var(--text); }
+.modal a { color: var(--accent); }
+
 @media (max-width: 768px) {
   body { padding: 12px; }
   .controls { flex-direction: column; align-items: stretch; }
@@ -138,6 +163,7 @@ tr:last-child td { border-bottom: none; }
         <button class="btn" onclick="document.getElementById('fileInput').click()">📁 本地文件</button>
         <input type="file" id="fileInput" accept=".h,.txt" onchange="loadLocalFile(event)">
       </div>
+      <button class="btn" onclick="toggleFormula()">📐 计算说明</button>
     </div>
     <span class="status" id="status">就绪</span>
   </div>
@@ -183,30 +209,23 @@ tr:last-child td { border-bottom: none; }
     <p style="font-size:12px;color:var(--text-dim)">或者拖拽本地的 <code>targets.h</code> 文件到页面上</p>
   </div>
 
-  <div class="formula-ref hidden" id="formulaRef" style="margin-top:24px;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:13px;line-height:1.8">
-    <h3 style="margin-bottom:8px;font-size:15px">计算说明</h3>
+  <div class="overlay" id="overlay" onclick="toggleFormula()"></div>
+  <div class="modal" id="formulaModal">
+    <button class="close-btn" onclick="toggleFormula()">&times;</button>
+    <h3>计算说明</h3>
     <p><strong>AM32 内部公式：</strong></p>
-    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
-actual_current(厘安) = (ADC_raw × 3300 / 41 - CURRENT_OFFSET × 100) / MILLIVOLT_PER_AMP
-    </code>
+    <code>actual_current(厘安) = (ADC_raw × 3300 / 41 - CURRENT_OFFSET × 100) / MILLIVOLT_PER_AMP</code>
     <p><strong>Betaflight 板载 ADC 公式：</strong></p>
-    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
-伏特(mV) = ADC_raw × Vref_mV / 4096<br>
-厘安 = (mV × 10000 / ibata_scale + ibata_offset) / 10
-    </code>
+    <code>伏特(mV) = ADC_raw × Vref_mV / 4096
+厘安 = (mV × 10000 / ibata_scale + ibata_offset) / 10</code>
     <p><strong>参数换算：</strong></p>
-    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
-ibata_scale = MILLIVOLT_PER_AMP × 10 &nbsp;&nbsp;← 因为 scale 单位是 mV/10A，而 MILLIVOLT_PER_AMP 单位是 mV/A<br>
-ibata_offset = -(CURRENT_OFFSET × 1000) / MILLIVOLT_PER_AMP &nbsp;&nbsp;← 运放零漂补偿 (电流引脚上 offset_mV = CURRENT_OFFSET)
-    </code>
-    <p style="color:var(--text-dim)">默认值：<code>MILLIVOLT_PER_AMP = 20</code>，<code>CURRENT_OFFSET = 0</code>。粗体字表示型号固件里显式定义的值，灰色为全局默认。</p>
-    <p style="color:var(--text-dim);margin-top:4px">
-      数据来源：<a href="https://github.com/am32-firmware/AM32" target="_blank" style="color:var(--accent)">am32-firmware/AM32</a>
-    </p>
-    <p style="color:var(--text-dim);margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+    <code>ibata_scale   = MILLIVOLT_PER_AMP × 10        ← scale 单位是 mV/10A
+ibata_offset = -(CURRENT_OFFSET × 1000) / MILLIVOLT_PER_AMP  ← 运放零漂补偿</code>
+    <p style="color:var(--text-dim)">默认值：<code>MILLIVOLT_PER_AMP = 20</code>，<code>CURRENT_OFFSET = 0</code>。粗体字表示显式定义的值，灰色为全局默认。</p>
+    <p style="color:var(--text-dim)">数据来源：<a href="https://github.com/am32-firmware/AM32" target="_blank">am32-firmware/AM32</a></p>
+    <p style="color:var(--text-dim);border-top:1px solid var(--border);padding-top:8px">
       本人仅熟悉 Betaflight + AM32。其他飞控/电调固件的参数映射欢迎
-      <a href="https://github.com/Martlet-Tech/esc-fc-scale-db" target="_blank" style="color:var(--accent)">PR</a>
-      或私信讨论，一起完善。
+      <a href="https://github.com/Martlet-Tech/esc-fc-scale-db" target="_blank">PR</a> 或私信讨论。
     </p>
   </div>
 </div>
@@ -375,7 +394,6 @@ function showData() {
   document.getElementById('filterRow').classList.remove('hidden');
   document.getElementById('statBar').classList.remove('hidden');
   document.getElementById('tableWrap').classList.remove('hidden');
-  document.getElementById('formulaRef').classList.remove('hidden');
   document.getElementById('emptyState').classList.add('hidden');
 
   document.getElementById('statTotal').textContent = targets.length;
@@ -456,6 +474,14 @@ function sortBy(key) {
   if (arrow) arrow.textContent = sortDir === 1 ? '↓' : '↑';
   render();
 }
+
+function toggleFormula() {
+  document.getElementById('overlay').classList.toggle('show');
+  document.getElementById('formulaModal').classList.toggle('show');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('formulaModal').classList.contains('show')) toggleFormula();
+});
 
 // drag & drop
 document.addEventListener('dragover', e => { e.preventDefault(); });
