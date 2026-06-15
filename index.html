@@ -193,10 +193,10 @@ tr:last-child td { border-bottom: none; }
           <th onclick="sortBy('scale')" style="background:rgba(63,185,80,.08)">ibata_scale <span class="arrow" id="arrow-scale"></span> <span style="color:var(--text-dim);font-weight:400">(mV/10A)</span></th>
           <th onclick="sortBy('ibatoffset')">ibata_offset (mA) <span class="arrow" id="arrow-ibatoffset"></span></th>
           <th onclick="sortBy('mvpa')">mV/A <span class="arrow" id="arrow-mvpa"></span> <span style="color:var(--text-dim);font-weight:400">(MILLIVOLT_PER_AMP)</span></th>
+          <th onclick="sortBy('offset')">CURRENT_OFFSET (mV) <span class="arrow" id="arrow-offset"></span></th>
           <th onclick="sortBy('firmware')">固件名 <span class="arrow" id="arrow-firmware"></span></th>
           <th onclick="sortBy('vendor')">厂商 <span class="arrow" id="arrow-vendor"></span></th>
           <th onclick="sortBy('mcu')">单片机 <span class="arrow" id="arrow-mcu"></span></th>
-          <th onclick="sortBy('offset')">CURRENT_OFFSET (mV) <span class="arrow" id="arrow-offset"></span></th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -347,10 +347,10 @@ function render() {
       <td><span class="scale-val">${t.scale}</span></td>
       <td class="${t.ibatoffset !== 0 ? 'offset-nonzero' : 'offset-val'}">${t.ibatoffset}</td>
       <td>${t.hasExplicitMvpa ? t.mvpa : `<span style="color:var(--text-dim)">${t.mvpa} (默认)</span>`}</td>
+      <td class="${t.offset !== 0 ? 'offset-nonzero' : 'offset-val'}">${t.offset}</td>
       <td style="color:var(--text-dim)">${escHtml(t.firmware)}</td>
       <td><span class="vendor-badge">${escHtml(t.vendor)}</span></td>
       <td><span class="mcu-badge ${t.mcuCls}">${escHtml(t.mcu)}</span></td>
-      <td class="${t.offset !== 0 ? 'offset-nonzero' : 'offset-val'}">${t.offset}</td>
     `;
     tbody.appendChild(tr);
   }
