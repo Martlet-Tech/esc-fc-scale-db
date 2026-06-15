@@ -9,7 +9,7 @@ Extracts factory-calibrated `MILLIVOLT_PER_AMP` values from [AM32](https://githu
 
 ## Usage 使用
 
-**Online 在线版:** [Open GitHub Pages](https://YOUR_USERNAME.github.io/esc-fc-scale-db/) *(replace with your URL after deploying)*
+**Online 在线版:** [Open GitHub Pages](https://martlet-tech.github.io/esc-fc-scale-db/)
 
 **Or 本地使用:** Open `index.html` in any browser, click "从 GitHub 拉取" or drag your local `targets.h` file onto the page.
 
