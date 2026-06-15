@@ -385,19 +385,43 @@ function showData() {
   render();
 }
 
+const CACHE_URL = './cache/targets.h';
+const CACHE_TIME_URL = './cache/updated.txt';
+
 async function fetchFromGitHub() {
   const btn = document.getElementById('btnFetch');
   btn.disabled = true;
-  status('正在拉取 ' + RAW_URL + ' ...', 'loading');
+  status('正在拉取最新 targets.h ...', 'loading');
+
+  // try live first
   try {
     const resp = await fetch(RAW_URL);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
     targets = parseTargets(text);
-    status(`✅ 已加载 ${targets.length} 个电调型号`, 'ok');
+    status(`✅ 已加载 ${targets.length} 个电调型号 (实时)`, 'ok');
     showData();
+    btn.disabled = false;
+    return;
   } catch (e) {
-    status('❌ 加载失败: ' + e.message, 'error');
+    console.warn('Live fetch failed, trying cache:', e.message);
+  }
+
+  // fallback to local cache
+  try {
+    const resp = await fetch(CACHE_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    targets = parseTargets(text);
+    let cacheNote = '本地缓存';
+    try {
+      const tr = await fetch(CACHE_TIME_URL);
+      if (tr.ok) cacheNote += ' (更新于 ' + (await tr.text()).trim() + ')';
+    } catch (_) {}
+    status(`✅ 已加载 ${targets.length} 个电调型号 (${cacheNote})`, 'ok');
+    showData();
+  } catch (e2) {
+    status('❌ 实时和缓存均加载失败: ' + e2.message, 'error');
   } finally {
     btn.disabled = false;
   }

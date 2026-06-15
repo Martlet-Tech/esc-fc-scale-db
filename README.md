@@ -45,6 +45,17 @@ ibata_offset = -(CURRENT_OFFSET × 1000) / MILLIVOLT_PER_AMP
 
 I have only used Betaflight and AM32 personally. I'm not familiar with current parameter mapping for other flight controllers (iNav / ArduPilot / KISS) or ESC firmwares (BLHeli_S / Bluejay / BLHeli_32). PRs and discussions are warmly welcome — let's build this database together.
 
+## Offline Cache 离线缓存
+
+For users in mainland China: `raw.githubusercontent.com` may be inaccessible.
+A GitHub Action (`update-cache.yml`) runs weekly to fetch the latest `targets.h`
+and stores it in `cache/`. The page automatically falls back to this local copy
+when the live fetch fails.
+
+中国大陆用户可能无法访问 `raw.githubusercontent.com`。仓库内置了 GitHub Action，
+每周自动抓取最新 `targets.h` 到 `cache/` 目录。页面会先尝试实时拉取，失败后自动
+切换为本地缓存版本。
+
 ## License 许可证
 
 MIT
