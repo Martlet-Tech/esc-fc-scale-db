@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AM32 ESC → Betaflight Current Config Calculator</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --orange: #d29922;
+  --red: #f85149;
+  --input-bg: #0d1117;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  padding: 24px;
+}
+.container { max-width: 1400px; margin: 0 auto; }
+.header { margin-bottom: 24px; }
+.header h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+.header p { color: var(--text-dim); font-size: 14px; }
+
+.controls {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 20px; padding: 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.controls .btn-group { display: flex; gap: 8px; }
+.btn {
+  padding: 8px 16px; border: 1px solid var(--border); border-radius: 6px;
+  background: #21262d; color: var(--text); cursor: pointer;
+  font-size: 13px; transition: .15s; white-space: nowrap;
+}
+.btn:hover { background: #30363d; border-color: var(--accent); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+.btn.primary:hover { background: #388bfd; }
+.btn.danger { background: #da3633; border-color: #da3633; color: #fff; }
+.btn.danger:hover { background: #f85149; }
+
+.status { font-size: 13px; color: var(--text-dim); margin-left: auto; }
+.status.error { color: var(--red); }
+.status.ok { color: var(--green); }
+.status.loading { color: var(--orange); }
+
+.filter-row {
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 12px;
+}
+.filter-row label { font-size: 13px; color: var(--text-dim); }
+.filter-row select, .filter-row input {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--input-bg); color: var(--text); font-size: 13px;
+}
+.filter-row select { min-width: 120px; }
+.filter-row input { min-width: 200px; }
+.stat-bar {
+  display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px;
+  font-size: 13px;
+}
+.stat-bar .stat { padding: 8px 14px; background: var(--surface); border-radius: 6px;
+  border: 1px solid var(--border); }
+.stat-bar .stat span { color: var(--accent); font-weight: 600; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead { background: var(--surface); position: sticky; top: 0; }
+th {
+  padding: 10px 12px; text-align: left; font-weight: 600;
+  border-bottom: 1px solid var(--border); white-space: nowrap;
+  cursor: pointer; user-select: none;
+}
+th:hover { color: var(--accent); }
+th .arrow { margin-left: 4px; font-size: 10px; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+tr:hover td { background: rgba(88,166,255,.04); }
+tr:last-child td { border-bottom: none; }
+.vendor-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  background: rgba(88,166,255,.1); color: var(--accent); font-size: 12px;
+}
+.mcu-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 12px;
+  font-size: 12px;
+}
+.mcu-at32 { background: rgba(88,166,255,.12); color: #79c0ff; }
+.mcu-stm32 { background: rgba(63,185,80,.12); color: var(--green); }
+.mcu-gd32 { background: rgba(210,153,34,.12); color: var(--orange); }
+.mcu-nxp { background: rgba(248,81,73,.12); color: var(--red); }
+.mcu-wch { background: rgba(163,113,247,.15); color: #bc8cff; }
+.scale-val { font-weight: 600; color: var(--green); font-size: 14px; }
+.offset-val { color: var(--text-dim); }
+.offset-nonzero { color: var(--orange); }
+.empty-state {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+}
+.empty-state .big-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state p { margin-bottom: 8px; }
+
+.file-input-wrap { position: relative; display: inline-block; }
+.file-input-wrap input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+.hidden { display: none; }
+
+@media (max-width: 768px) {
+  body { padding: 12px; }
+  .controls { flex-direction: column; align-items: stretch; }
+  .controls .btn-group { flex-wrap: wrap; }
+  .status { margin-left: 0; }
+  .filter-row { flex-direction: column; align-items: stretch; }
+  .filter-row select, .filter-row input { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+  <div class="header">
+    <h1>🧮 AM32 → Betaflight 电流计参数计算器</h1>
+    <p>从 <code>targets.h</code> 解析所有电调型号的 <code>MILLIVOLT_PER_AMP</code>，计算 BF 板载 ADC 模式的 <code>ibata_scale</code> / <code>ibata_offset</code></p>
+  </div>
+
+  <div class="controls">
+    <div class="btn-group">
+      <button class="btn primary" id="btnFetch" onclick="fetchFromGitHub()">⬇ 从 GitHub 拉取</button>
+      <div class="file-input-wrap">
+        <button class="btn" onclick="document.getElementById('fileInput').click()">📁 本地文件</button>
+        <input type="file" id="fileInput" accept=".h,.txt" onchange="loadLocalFile(event)">
+      </div>
+    </div>
+    <span class="status" id="status">就绪</span>
+  </div>
+
+  <div class="filter-row hidden" id="filterRow">
+    <label>厂商：</label>
+    <select id="filterVendor" onchange="applyFilters()"><option value="">全部</option></select>
+    <label>单片机：</label>
+    <select id="filterMcu" onchange="applyFilters()"><option value="">全部</option></select>
+    <label>搜索：</label>
+    <input id="filterSearch" placeholder="型号名称..." oninput="applyFilters()">
+    <label>仅显示有 MILLIVOLT_PER_AMP：</label>
+    <input type="checkbox" id="filterHasScale" checked onchange="applyFilters()">
+  </div>
+
+  <div class="stat-bar hidden" id="statBar">
+    <div class="stat">总数 <span id="statTotal">0</span></div>
+    <div class="stat">有 MILLIVOLT_PER_AMP <span id="statWithScale">0</span></div>
+    <div class="stat">当前筛选 <span id="statFiltered">0</span></div>
+  </div>
+
+  <div class="table-wrap hidden" id="tableWrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortBy('name')">目标型号 <span class="arrow" id="arrow-name">↓</span></th>
+          <th onclick="sortBy('firmware')">固件名 <span class="arrow" id="arrow-firmware"></span></th>
+          <th onclick="sortBy('vendor')">厂商 <span class="arrow" id="arrow-vendor"></span></th>
+          <th onclick="sortBy('mcu')">单片机 <span class="arrow" id="arrow-mcu"></span></th>
+          <th onclick="sortBy('mvpa')">mV/A <span class="arrow" id="arrow-mvpa"></span> <span style="color:var(--text-dim);font-weight:400">(MILLIVOLT_PER_AMP)</span></th>
+          <th onclick="sortBy('offset')">CURRENT_OFFSET (mV) <span class="arrow" id="arrow-offset"></span></th>
+          <th onclick="sortBy('scale')" style="background:rgba(63,185,80,.08)">ibata_scale <span class="arrow" id="arrow-scale"></span> <span style="color:var(--text-dim);font-weight:400">(mV/10A)</span></th>
+          <th onclick="sortBy('ibatoffset')">ibata_offset (mA) <span class="arrow" id="arrow-ibatoffset"></span></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="big-icon">📡</div>
+    <p>点击「从 GitHub 拉取」加载最新 AM32 固件的 target 定义</p>
+    <p style="font-size:12px;color:var(--text-dim)">或者拖拽本地的 <code>targets.h</code> 文件到页面上</p>
+  </div>
+
+  <div class="formula-ref hidden" id="formulaRef" style="margin-top:24px;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:13px;line-height:1.8">
+    <h3 style="margin-bottom:8px;font-size:15px">计算说明</h3>
+    <p><strong>AM32 内部公式：</strong></p>
+    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
+actual_current(厘安) = (ADC_raw × 3300 / 41 - CURRENT_OFFSET × 100) / MILLIVOLT_PER_AMP
+    </code>
+    <p><strong>Betaflight 板载 ADC 公式：</strong></p>
+    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
+伏特(mV) = ADC_raw × Vref_mV / 4096<br>
+厘安 = (mV × 10000 / ibata_scale + ibata_offset) / 10
+    </code>
+    <p><strong>参数换算：</strong></p>
+    <code style="display:block;padding:8px 12px;background:var(--bg);border-radius:4px;margin:4px 0 12px">
+ibata_scale = MILLIVOLT_PER_AMP × 10 &nbsp;&nbsp;← 因为 scale 单位是 mV/10A，而 MILLIVOLT_PER_AMP 单位是 mV/A<br>
+ibata_offset = -(CURRENT_OFFSET × 1000) / MILLIVOLT_PER_AMP &nbsp;&nbsp;← 运放零漂补偿 (电流引脚上 offset_mV = CURRENT_OFFSET)
+    </code>
+    <p style="color:var(--text-dim)">默认值：<code>MILLIVOLT_PER_AMP = 20</code>，<code>CURRENT_OFFSET = 0</code>。粗体字表示型号固件里显式定义的值，灰色为全局默认。</p>
+    <p style="color:var(--text-dim);margin-top:4px">
+      数据来源：<a href="https://github.com/am32-firmware/AM32" target="_blank" style="color:var(--accent)">am32-firmware/AM32</a>
+    </p>
+    <p style="color:var(--text-dim);margin-top:8px;border-top:1px solid var(--border);padding-top:8px">
+      本人仅熟悉 Betaflight + AM32。其他飞控/电调固件的参数映射欢迎
+      <a href="https://github.com/YOUR_USERNAME/esc-fc-scale-db" target="_blank" style="color:var(--accent)">PR</a>
+      或私信讨论，一起完善。
+    </p>
+  </div>
+</div>
+
+<script>
+const RAW_URL = 'https://raw.githubusercontent.com/am32-firmware/AM32/main/Inc/targets.h';
+const MCU_MAP = {
+  F421:  { label: 'AT32F421', cls: 'mcu-at32' },
+  F415:  { label: 'AT32F415', cls: 'mcu-at32' },
+  F051:  { label: 'STM32F051', cls: 'mcu-stm32' },
+  F031:  { label: 'STM32F031', cls: 'mcu-stm32' },
+  G071:  { label: 'STM32G071', cls: 'mcu-stm32' },
+  G031:  { label: 'STM32G031', cls: 'mcu-stm32' },
+  G431:  { label: 'STM32G431', cls: 'mcu-stm32' },
+  L431:  { label: 'STM32L431', cls: 'mcu-stm32' },
+  E230:  { label: 'GD32E230', cls: 'mcu-gd32' },
+  V203:  { label: 'CH32V203', cls: 'mcu-wch' },
+  A153:  { label: 'MCXA153', cls: 'mcu-nxp' },
+};
+
+let targets = [];
+let sortKey = 'name';
+let sortDir = 1;
+
+function status(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+function detectMcu(name) {
+  const parts = name.split('_');
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (MCU_MAP[parts[i]]) return MCU_MAP[parts[i]];
+  }
+  return { label: '?', cls: '' };
+}
+
+function detectVendor(name) {
+  return name.split('_')[0] || '?';
+}
+
+function parseTargets(text) {
+  const lines = text.split('\n');
+  const results = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    const m = line.match(/^#ifdef\s+(\w+)/);
+    if (m) {
+      const targetName = m[1];
+      i++;
+      const block = { name: targetName, firmware: '', mvpa: null, offset: null };
+      while (i < lines.length && !lines[i].trim().startsWith('#endif') && !lines[i].trim().startsWith('#ifdef')) {
+        const l = lines[i].trim();
+        // skip #ifdef inside block (rare, e.g. nested)
+        if (l.startsWith('#ifdef')) break;
+        let fv = l.match(/^#define\s+FIRMWARE_NAME\s+"([^"]*)"/);
+        if (fv) block.firmware = fv[1].trim();
+        let mv = l.match(/^#define\s+MILLIVOLT_PER_AMP\s+(-?\d+)/);
+        if (mv) block.mvpa = parseInt(mv[1]);
+        let co = l.match(/^#define\s+CURRENT_OFFSET\s+(-?\d+)/);
+        if (co) block.offset = parseInt(co[1]);
+        if (l.startsWith('#endif')) break;
+        i++;
+      }
+      if (block.firmware) {
+        const info = detectMcu(targetName);
+        const vendor = detectVendor(targetName);
+        const mvpa = block.mvpa !== null ? block.mvpa : 20; // global default
+        const coff = block.offset !== null ? block.offset : 0;
+        results.push({
+          name: targetName,
+          firmware: block.firmware,
+          vendor,
+          mcu: info.label,
+          mcuCls: info.cls,
+          mvpa,
+          offset: coff,
+          hasExplicitMvpa: block.mvpa !== null,
+          scale: mvpa * 10,
+          ibatoffset: coff !== 0 ? Math.round(-coff * 1000 / mvpa) : 0,
+        });
+      }
+      // skip to #endif
+      while (i < lines.length && !lines[i].trim().startsWith('#endif')) i++;
+      i++; // skip #endif
+    } else {
+      i++;
+    }
+  }
+  return results;
+}
+
+function render() {
+  const filtered = getFiltered();
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  // sort
+  filtered.sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (sortKey === 'mvpa' || sortKey === 'offset' || sortKey === 'scale' || sortKey === 'ibatoffset') {
+      va = va ?? 0; vb = vb ?? 0;
+    } else {
+      va = (va ?? '').toLowerCase();
+      vb = (vb ?? '').toLowerCase();
+    }
+    if (va < vb) return -sortDir;
+    if (va > vb) return sortDir;
+    return 0;
+  });
+
+  for (const t of filtered) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${escHtml(t.name)}</strong></td>
+      <td style="color:var(--text-dim)">${escHtml(t.firmware)}</td>
+      <td><span class="vendor-badge">${escHtml(t.vendor)}</span></td>
+      <td><span class="mcu-badge ${t.mcuCls}">${escHtml(t.mcu)}</span></td>
+      <td>${t.hasExplicitMvpa ? t.mvpa : `<span style="color:var(--text-dim)">${t.mvpa} (默认)</span>`}</td>
+      <td class="${t.offset !== 0 ? 'offset-nonzero' : 'offset-val'}">${t.offset}</td>
+      <td><span class="scale-val">${t.scale}</span></td>
+      <td class="${t.ibatoffset !== 0 ? 'offset-nonzero' : 'offset-val'}">${t.ibatoffset}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('statFiltered').textContent = filtered.length;
+}
+
+function getFiltered() {
+  const v = document.getElementById('filterVendor').value;
+  const m = document.getElementById('filterMcu').value;
+  const q = document.getElementById('filterSearch').value.toLowerCase().trim();
+  const onlyScale = document.getElementById('filterHasScale').checked;
+
+  return targets.filter(t => {
+    if (v && t.vendor !== v) return false;
+    if (m && t.mcu !== m) return false;
+    if (q && !t.name.toLowerCase().includes(q) && !t.firmware.toLowerCase().includes(q)) return false;
+    if (onlyScale && !t.hasExplicitMvpa) return false;
+    return true;
+  });
+}
+
+function applyFilters() { render(); }
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function populateFilters() {
+  const vendors = [...new Set(targets.map(t => t.vendor))].sort();
+  const mcus = [...new Set(targets.map(t => t.mcu))].sort();
+
+  const selV = document.getElementById('filterVendor');
+  const selM = document.getElementById('filterMcu');
+  selV.innerHTML = '<option value="">全部</option>' + vendors.map(v => `<option value="${escHtml(v)}">${escHtml(v)}</option>`).join('');
+  selM.innerHTML = '<option value="">全部</option>' + mcus.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+}
+
+function showData() {
+  document.getElementById('filterRow').classList.remove('hidden');
+  document.getElementById('statBar').classList.remove('hidden');
+  document.getElementById('tableWrap').classList.remove('hidden');
+  document.getElementById('formulaRef').classList.remove('hidden');
+  document.getElementById('emptyState').classList.add('hidden');
+
+  document.getElementById('statTotal').textContent = targets.length;
+  document.getElementById('statWithScale').textContent = targets.filter(t => t.hasExplicitMvpa).length;
+
+  populateFilters();
+  render();
+}
+
+async function fetchFromGitHub() {
+  const btn = document.getElementById('btnFetch');
+  btn.disabled = true;
+  status('正在拉取 ' + RAW_URL + ' ...', 'loading');
+  try {
+    const resp = await fetch(RAW_URL);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    targets = parseTargets(text);
+    status(`✅ 已加载 ${targets.length} 个电调型号`, 'ok');
+    showData();
+  } catch (e) {
+    status('❌ 加载失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function loadLocalFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  status('正在解析 ' + file.name + ' ...', 'loading');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    targets = parseTargets(e.target.result);
+    status(`✅ 已加载 ${targets.length} 个电调型号 (本地文件)`, 'ok');
+    showData();
+  };
+  reader.onerror = function() {
+    status('❌ 文件读取失败', 'error');
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function sortBy(key) {
+  if (sortKey === key) {
+    sortDir = -sortDir;
+  } else {
+    sortKey = key;
+    sortDir = 1;
+  }
+  document.querySelectorAll('th .arrow').forEach(el => el.textContent = '');
+  const arrow = document.getElementById('arrow-' + key);
+  if (arrow) arrow.textContent = sortDir === 1 ? '↓' : '↑';
+  render();
+}
+
+// drag & drop
+document.addEventListener('dragover', e => { e.preventDefault(); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const files = e.dataTransfer.files;
+  if (files.length > 0 && (files[0].name.endsWith('.h') || files[0].name.endsWith('.txt'))) {
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      targets = parseTargets(ev.target.result);
+      status(`✅ 已加载 ${targets.length} 个电调型号 (拖放)`, 'ok');
+      showData();
+    };
+    reader.readAsText(files[0]);
+  }
+});
+</script>
+</body>
+</html>
